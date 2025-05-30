@@ -7,7 +7,8 @@
 #include <pcl/correspondence.h>
 #include <Eigen/Dense>
 #include <omp.h> // 并行支持
-
+#include <pcl/features/normal_3d.h> // PCL法线计算头文件
+#include <pcl/common/angles.h>
 
 // 收敛标准类
 class ConvergenceCriteria {
@@ -23,16 +24,19 @@ public:
 
 	ConvergenceCriteria()
 		: max_iterations_(50)
-		, rotation_threshold_(0.99998)  // 对应约0.1°的旋转
+		, rotation_threshold_(0.99998)
 		, translation_threshold_(1e-8)
 		, mse_threshold_absolute_(1e-6)
 		, mse_threshold_relative_(1e-6)
-		, max_iterations_similar_transforms_(3)
+		, max_iterations_similar_transforms_(5)
 		, failure_after_max_iter_(false)
 		, iterations_(0)
 		, iterations_similar_transforms_(0)
 		, correspondences_prev_mse_(std::numeric_limits<double>::max())
 		, convergence_state_(NOT_CONVERGED) {
+
+
+
 	}
 
 	void setMaxIterations(int max_iter) { max_iterations_ = max_iter; }
@@ -112,8 +116,7 @@ public:
 		correspondences_prev_mse_ = correspondences_cur_mse;
 		return false;
 	}
-	//zancun
-	ConvergenceState getConvergenceState() const { return convergence_state_; }
+
 	int getIterations() const { return iterations_; }
 
 private:
@@ -146,32 +149,38 @@ public:
 	CustomICP() {
 		convergence_criteria_.setRotationThreshold(0.99998); // 约0.8°
 		convergence_criteria_.setTranslationThreshold(1e-8);
-		convergence_criteria_.setMSEThresholdAbsolute(1e-6);
-		convergence_criteria_.setMSEThresholdRelative(1e-6);
-		convergence_criteria_.setMaxIterationsSimilarTransforms(3);
+		convergence_criteria_.setMSEThresholdAbsolute(1e-8);
+		convergence_criteria_.setMSEThresholdRelative(1e-8);
+		convergence_criteria_.setMaxIterationsSimilarTransforms(5);
 	}
 
 	void setInputSource(const pcl::PointCloud<pcl::PointXYZ>::Ptr& source) {
 		source_ = source;
+		source_normals_ = pcl::PointCloud<pcl::Normal>::Ptr(new pcl::PointCloud<pcl::Normal>);
+		pcl::NormalEstimation<pcl::PointXYZ, pcl::Normal> ne;
+		pcl::search::KdTree<pcl::PointXYZ>::Ptr tree(new pcl::search::KdTree<pcl::PointXYZ>);
+		ne.setInputCloud(source_);
+		ne.setSearchMethod(tree);
+		ne.setKSearch(50);
+		ne.compute(*source_normals_);
+		transformed_source_normals_ = source_normals_;
 	}
 	void setInputTarget(const pcl::PointCloud<pcl::PointXYZ>::Ptr& target) {
 		target_ = target;
+		target_normals_ = pcl::PointCloud<pcl::Normal>::Ptr(new pcl::PointCloud<pcl::Normal>);
+		pcl::NormalEstimation<pcl::PointXYZ, pcl::Normal> ne;
+		pcl::search::KdTree<pcl::PointXYZ>::Ptr tree(new pcl::search::KdTree<pcl::PointXYZ>);
+		ne.setInputCloud(target_);
+		ne.setSearchMethod(tree);
+		ne.setKSearch(50);
+		ne.compute(*target_normals_);
 	}
-
 	void setMaximumIterations(int max_iter) {
 		max_iterations_ = max_iter;
 		convergence_criteria_.setMaxIterations(max_iter);
 	}
-	void setTransformationEpsilon(double trans_eps) {
-		transformation_epsilon_ = trans_eps;
-	}
 	void setMaxCorrespondenceDistance(double dist) { max_correspondence_distance_ = dist; }
 	void setReciprocal(bool enable) { is_reciprocal_ = enable; }
-	void setEuclideanFitnessEpsilon(double eps) { euclidean_fitness_epsilon_ = eps; }
-	void setRANSACOutlierRejectionThreshold(double threshold) {
-		ransac_threshold_ = threshold;
-	}
-	void setUseRANSAC(bool use) { use_ransac_ = use; }
 
 	// 收敛标准设置函数
 	void setRotationThreshold(double threshold) { convergence_criteria_.setRotationThreshold(threshold); }
@@ -179,8 +188,6 @@ public:
 	void setMSEThresholdAbsolute(double threshold) { convergence_criteria_.setMSEThresholdAbsolute(threshold); }
 	void setMSEThresholdRelative(double threshold) { convergence_criteria_.setMSEThresholdRelative(threshold); }
 	void setMaxIterationsSimilarTransforms(int iterations) { convergence_criteria_.setMaxIterationsSimilarTransforms(iterations); }
-
-
 
 	void align(pcl::PointCloud<pcl::PointXYZ>& output) {
 		final_transformation_ = Eigen::Matrix4f::Identity();
@@ -192,12 +199,10 @@ public:
 
 		Eigen::Matrix4f transformation = Eigen::Matrix4f::Identity();
 		Eigen::Matrix4f delta_transformation;
+		pcl::CorrespondencesPtr correspondences(new pcl::Correspondences);
 
-		while (!convergence_criteria_.hasConverged(delta_transformation, correspondences_)) {
-			
-
-			// 寻找对应关系
-			pcl::CorrespondencesPtr correspondences(new pcl::Correspondences);
+		do {
+			// 1、估计点对
 			findCorrespondences(source_transformed, &target_tree, correspondences, &source_tree);
 			std::cout << "Iteration " << convergence_criteria_.getIterations()
 				<< ", correspondences found: " << correspondences->size() << std::endl;
@@ -207,31 +212,30 @@ public:
 				break;
 			}
 
-			// 对应点对筛选
+			// 2、对应点对筛选
 			pcl::CorrespondencesPtr filtered_correspondences(new pcl::Correspondences);
-			filterCorrespondences(correspondences, filtered_correspondences);
+			filterCorrespondencesByNormal(correspondences, filtered_correspondences);
 			std::cout << "After filtering, correspondences left: " << filtered_correspondences->size() << std::endl;
 
 			if (filtered_correspondences->size() < min_number_correspondences_) {
 				std::cerr << "Not enough correspondences after filtering: " << filtered_correspondences->size() << std::endl;
 				break;
 			}
-
-			// 保存当前对应关系供收敛判断使用
 			correspondences_ = filtered_correspondences;
 
-
+			// 3、变换估计
 			estimateTransformation(source_transformed, target_, filtered_correspondences, delta_transformation);
 
 			transformation = delta_transformation * transformation;
 			final_transformation_ = transformation;
 
 			transformPointCloud(source_transformed, source_transformed, delta_transformation);
-		}
+			transformNormals(delta_transformation);
+
+		} while (!convergence_criteria_.hasConverged(delta_transformation, correspondences_));
 
 		output = *source_transformed;
-		std::cout << "ICP converged after " << convergence_criteria_.getIterations()
-			<< " iterations. Convergence state: " << convergence_criteria_.getConvergenceState() << std::endl;
+		std::cout << "ICP converged after " << convergence_criteria_.getIterations() << std::endl;
 	}
 
 	Eigen::Matrix4f getFinalTransformation() const { return final_transformation_; }
@@ -239,17 +243,31 @@ public:
 private:
 	pcl::PointCloud<pcl::PointXYZ>::Ptr source_ = nullptr;
 	pcl::PointCloud<pcl::PointXYZ>::Ptr target_ = nullptr;
+	pcl::PointCloud<pcl::Normal>::Ptr source_normals_ = nullptr;
+	pcl::PointCloud<pcl::Normal>::Ptr transformed_source_normals_ = nullptr;
+	pcl::PointCloud<pcl::Normal>::Ptr target_normals_ = nullptr;
+
 	int max_iterations_ = 50;
-	double transformation_epsilon_ = 1e-8;
 	double max_correspondence_distance_ = 0.1;
-	double euclidean_fitness_epsilon_ = 1e-6;
-	double ransac_threshold_ = 0.01;
 	bool is_reciprocal_ = true;
-	bool use_ransac_ = false;
-	int min_number_correspondences_ = 3;
+	int min_number_correspondences_ = 5;
 	Eigen::Matrix4f final_transformation_ = Eigen::Matrix4f::Identity();
 	pcl::CorrespondencesPtr correspondences_;
 	ConvergenceCriteria convergence_criteria_;
+
+	// 变换法线方向
+	void transformNormals(const Eigen::Matrix4f& transform) {
+		if (!transformed_source_normals_) return;
+		Eigen::Matrix3f R = transform.block<3, 3>(0, 0); 
+
+#pragma omp parallel for
+		for (size_t i = 0; i < transformed_source_normals_->size(); ++i) {
+			Eigen::Vector3f n = transformed_source_normals_->points[i].getNormalVector3fMap();
+			n = R * n; 
+			n.normalize();
+			transformed_source_normals_->points[i].getNormalVector3fMap() = n;
+		}
+	}
 
 	// 查找对应点（支持单向/双向匹配）
 	void findCorrespondences(
@@ -324,39 +342,41 @@ private:
 			});
 	}
 
-	// 对应点对筛选
-	void filterCorrespondences(
+	// 基于法线的对应点筛选
+	void filterCorrespondencesByNormal(
 		const pcl::CorrespondencesPtr& correspondences,
-		pcl::CorrespondencesPtr& filtered_correspondences) {
+		pcl::CorrespondencesPtr& filtered, double angle_threshold = pcl::deg2rad(10.0)) {
+		filtered->clear();
+		if (!correspondences || !transformed_source_normals_ || !target_normals_) return;
 
-		if (use_ransac_) {
-			// 使用RANSAC进行外点剔除
-			filtered_correspondences = ransacFilter(correspondences);
-		}
-		else {
-			// 简单距离阈值筛选
-			filtered_correspondences.reset(new pcl::Correspondences);
-			for (const auto& corr : *correspondences) {
-				if (corr.distance < max_correspondence_distance_) {
-					filtered_correspondences->push_back(corr);
-				}
-			}
-		}
-	}
+		const float cos_threshold = std::cos(angle_threshold);
+		const size_t num_threads = omp_get_max_threads();
+		std::vector<std::vector<pcl::Correspondence>> thread_filtered(num_threads);
 
-	// RANSAC外点剔除
-	pcl::CorrespondencesPtr ransacFilter(const pcl::CorrespondencesPtr& correspondences) {
-		// 简单实现RANSAC筛选，实际应用中可能需要更复杂的实现
-		pcl::CorrespondencesPtr inliers(new pcl::Correspondences);
+#pragma omp parallel for
+		for (size_t i = 0; i < correspondences->size(); ++i) {
+			const auto& corr = correspondences->at(i);
+			int src_idx = corr.index_query;
+			int tgt_idx = corr.index_match;
 
-		// 这里简化处理，实际应该实现完整的RANSAC算法
-		for (const auto& corr : *correspondences) {
-			if (corr.distance < ransac_threshold_) {
-				inliers->push_back(corr);
+			if (src_idx >= transformed_source_normals_->size() || tgt_idx >= target_normals_->size())
+				continue;
+
+			Eigen::Vector3f n1 = transformed_source_normals_->points[src_idx].getNormalVector3fMap();
+			Eigen::Vector3f n2 = target_normals_->points[tgt_idx].getNormalVector3fMap();
+			float dot = std::abs(n1.dot(n2)); 
+
+			if (dot >= cos_threshold) {
+				thread_filtered[omp_get_thread_num()].push_back(corr);
 			}
 		}
 
-		return inliers;
+		for (const auto& thread_corr : thread_filtered) {
+			filtered->insert(filtered->end(), thread_corr.begin(), thread_corr.end());
+		}
+
+		PCL_INFO("[filterCorrespondencesByNormal] Filtered %zu -> %zu correspondences\n",
+			correspondences->size(), filtered->size());
 	}
 
 	// 重载函数，接收pcl::Correspondences格式的对应关系

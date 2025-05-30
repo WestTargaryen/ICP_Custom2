@@ -15,10 +15,10 @@ int main(int argc, char** argv) {
     CustomICP icp;
     icp.setInputSource(source);
     icp.setInputTarget(target);
-    icp.setMaximumIterations(100);
-    icp.setTransformationEpsilon(1e-8);
+    icp.setMaximumIterations(200);
+    icp.setTranslationThreshold(1e-10);
     icp.setMaxCorrespondenceDistance(0.1);
-
+    
     pcl::PointCloud<pcl::PointXYZ>::Ptr output(new pcl::PointCloud<pcl::PointXYZ>);
     icp.align(*output);
     pcl::io::savePCDFile("11.pcd", *output);
