@@ -112,7 +112,7 @@ public:
 		correspondences_prev_mse_ = correspondences_cur_mse;
 		return false;
 	}
-
+	//zancun
 	ConvergenceState getConvergenceState() const { return convergence_state_; }
 	int getIterations() const { return iterations_; }
 
