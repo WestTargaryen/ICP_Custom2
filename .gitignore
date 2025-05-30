@@ -1,7 +1,3 @@
 .vs/
-.ply
-.pts
-.bak
-**/.obj
-.log
-.tlog
+**/*.pts
+**/*.obj
