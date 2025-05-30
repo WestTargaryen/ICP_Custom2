@@ -1,0 +1,34 @@
+﻿  CustomICP.cpp
+D:\software\PCL1.14\PCL1.14.0\3rdParty\Eigen3\include\eigen3\Eigen\src\Core\arch\Default\Half.h(1,1): warning C4819: 该文件包含不能在当前代码页(936)中表示的字符。请将该文件保存为 Unicode 格式以防止数据丢失
+  (编译源文件“CustomICP.cpp”)
+  
+D:\software\PCL1.14\PCL1.14.0\3rdParty\Eigen3\include\eigen3\Eigen\src\Core\arch\Default\BFloat16.h(1,1): warning C4819: 该文件包含不能在当前代码页(936)中表示的字符。请将该文件保存为 Unicode 格式以防止数据丢失
+  (编译源文件“CustomICP.cpp”)
+  
+D:\software\PCL1.14\PCL1.14.0\3rdParty\Eigen3\include\eigen3\Eigen\src\Core\arch\Default\GenericPacketMathFunctions.h(676,1): warning C4819: 该文件包含不能在当前代码页(936)中表示的字符。请将该文件保存为 Unicode 格式以防止数据丢失
+  (编译源文件“CustomICP.cpp”)
+  
+  main.cpp
+D:\software\PCL1.14\PCL1.14.0\3rdParty\Eigen3\include\eigen3\Eigen\src\Core\arch\Default\Half.h(1,1): warning C4819: 该文件包含不能在当前代码页(936)中表示的字符。请将该文件保存为 Unicode 格式以防止数据丢失
+  (编译源文件“main.cpp”)
+  
+D:\software\PCL1.14\PCL1.14.0\3rdParty\Eigen3\include\eigen3\Eigen\src\Core\arch\Default\BFloat16.h(1,1): warning C4819: 该文件包含不能在当前代码页(936)中表示的字符。请将该文件保存为 Unicode 格式以防止数据丢失
+  (编译源文件“main.cpp”)
+  
+D:\software\PCL1.14\PCL1.14.0\3rdParty\Eigen3\include\eigen3\Eigen\src\Core\arch\Default\GenericPacketMathFunctions.h(676,1): warning C4819: 该文件包含不能在当前代码页(936)中表示的字符。请将该文件保存为 Unicode 格式以防止数据丢失
+  (编译源文件“main.cpp”)
+  
+D:\software\PCL1.14\PCL1.14.0\include\pcl-1.14\pcl\visualization\interactor_style.h(1,1): warning C4819: 该文件包含不能在当前代码页(936)中表示的字符。请将该文件保存为 Unicode 格式以防止数据丢失
+  (编译源文件“main.cpp”)
+  
+D:\software\PCL1.14\PCL1.14.0\include\pcl-1.14\pcl\visualization\pcl_visualizer.h(1603,1): warning C4819: 该文件包含不能在当前代码页(936)中表示的字符。请将该文件保存为 Unicode 格式以防止数据丢失
+  (编译源文件“main.cpp”)
+  
+D:\software\PCL1.14\PCL1.14.0\3rdParty\VTK\include\vtk-9.3\vtkPolyDataMapper.h(1,1): warning C4819: 该文件包含不能在当前代码页(936)中表示的字符。请将该文件保存为 Unicode 格式以防止数据丢失
+  (编译源文件“main.cpp”)
+  
+  正在生成代码
+  Previous IPDB not found, fall back to full compilation.
+  All 4754 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
+  已完成代码的生成
+  ICP_Custom.vcxproj -> D:\softwarefiles\pcl\ICP_Custom\x64\Release\ICP_Custom.exe
