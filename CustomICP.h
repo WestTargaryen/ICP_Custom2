@@ -224,7 +224,7 @@ public:
 			correspondences_ = filtered_correspondences;
 
 			// 3、变换估计
-			estimateTransformation(source_transformed, target_, filtered_correspondences, delta_transformation);
+			estimateTransformationSVD(source_transformed, target_, filtered_correspondences, delta_transformation);
 
 			transformation = delta_transformation * transformation;
 			final_transformation_ = transformation;
@@ -380,7 +380,7 @@ private:
 	}
 
 	// 重载函数，接收pcl::Correspondences格式的对应关系
-	void estimateTransformation(
+	void estimateTransformationSVD(
 		const pcl::PointCloud<pcl::PointXYZ>::Ptr& source,
 		const pcl::PointCloud<pcl::PointXYZ>::Ptr& target,
 		const pcl::CorrespondencesPtr& correspondences,
@@ -397,11 +397,11 @@ private:
 		}
 
 		// 调用原函数进行变换估计
-		estimateTransformation(source, target, src_indices, tgt_indices, transformation);
+		estimateTransformationSVD(source, target, src_indices, tgt_indices, transformation);
 	}
 
 	// 变换矩阵估计（SVD）
-	void estimateTransformation(
+	void estimateTransformationSVD(
 		const pcl::PointCloud<pcl::PointXYZ>::Ptr& source,
 		const pcl::PointCloud<pcl::PointXYZ>::Ptr& target,
 		const std::vector<int>& src_indices,
